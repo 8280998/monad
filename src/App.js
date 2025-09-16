@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import Modal from 'react-modal';
 import { ethers } from 'ethers';
-import './App.css'; // Import the new CSS for styling
+import './App.css'; // Import the CSS for styling
 
 // Set app element for modal accessibility
 Modal.setAppElement('#root');
@@ -98,7 +98,7 @@ const ERC20_ABI = [
   }
 ];
 
-// Hardcoded values - removed from UI
+// Hardcoded values
 const RPC_URL = "https://testnet-rpc.monad.xyz";
 const CHAIN_ID = 10143;
 const CONTRACT_ADDRESS = "0xd081Ae7bA1Ee5e872690F2cC26dfa588531eA628";
@@ -132,66 +132,88 @@ const App = () => {
     setLogs(prev => [...prev, { message, txHash }]);
   };
 
-  // Detect and prioritize wallets
-  const detectWallet = () => {
-    if (window.okxwallet) {
-      window.ethereum = window.okxwallet.ethereum;
-      return 'OKX';
-    }
-    if (typeof window.ethereum !== 'undefined') {
-      return 'MetaMask/Coinbase';
-    }
-    if (window.coinbaseWalletExtension) {
-      window.ethereum = window.coinbaseWalletExtension;
-      return 'Coinbase';
-    }
-    return null;
-  };
+  const connectWithWallet = async (walletType) => {
+    let ethereumProvider;
+    let walletName = walletType.charAt(0).toUpperCase() + walletType.slice(1);
 
-  const connectWallet = async () => {
-    const wallet = detectWallet();
-    if (!window.ethereum) {
-      addLog("No wallet detected. Install MetaMask, OKX, or Coinbase Wallet.");
+    if (walletType === 'metamask') {
+      if (!window.ethereum || !window.ethereum.isMetaMask) {
+        addLog("MetaMask not detected. Please install or enable it.");
+        return;
+      }
+      ethereumProvider = window.ethereum;
+    } else if (walletType === 'okx') {
+      if (!window.okxwallet) {
+        addLog("OKX Wallet not detected. Please install or enable it.");
+        return;
+      }
+      ethereumProvider = window.okxwallet;
+    } else if (walletType === 'coinbase') {
+      if (!window.coinbaseWalletExtension) {
+        addLog("Coinbase Wallet not detected. Please install or enable it.");
+        return;
+      }
+      ethereumProvider = window.coinbaseWalletExtension;
+    } else {
+      addLog("Unsupported wallet type.");
       return;
     }
 
     try {
-      // Switch to Monad Testnet
-      try {
-        await window.ethereum.request({
-          method: 'wallet_switchEthereumChain',
-          params: [{ chainId: MONAD_CHAIN_ID_HEX }],
-        });
-      } catch (switchError) {
-        if (switchError.code === 4902) { // Chain not added
-          await window.ethereum.request({
-            method: 'wallet_addEthereumChain',
-            params: [{
-              chainId: MONAD_CHAIN_ID_HEX,
-              chainName: 'Monad Testnet',
-              rpcUrls: [RPC_URL],
-              nativeCurrency: { name: 'MON', symbol: 'MON', decimals: 18 },
-              blockExplorerUrls: ['https://testnet.monadexplorer.com/'],
-            }],
-          });
+      // Request accounts - this should prompt the wallet
+      const accounts = await ethereumProvider.request({ method: 'eth_requestAccounts' });
+
+      const newProvider = new ethers.BrowserProvider(ethereumProvider);
+      const network = await newProvider.getNetwork();
+
+      const isCoinbase = walletType === 'coinbase';
+
+      if (Number(network.chainId) !== CHAIN_ID) {
+        if (isCoinbase) {
+          addLog("Coinbase Wallet detected: Please add Monad Testnet manually in your wallet settings.");
+          addLog("Network details: Chain ID: 10143, RPC: https://testnet-rpc.monad.xyz, Symbol: MON, Explorer: https://testnet.monadexplorer.com");
+          // Proceed anyway, as auto-switch not supported
         } else {
-          throw switchError;
+          // Attempt switch for MetaMask/OKX
+          try {
+            await ethereumProvider.request({
+              method: 'wallet_switchEthereumChain',
+              params: [{ chainId: MONAD_CHAIN_ID_HEX }],
+            });
+          } catch (switchError) {
+            if (switchError.code === 4902) {
+              await ethereumProvider.request({
+                method: 'wallet_addEthereumChain',
+                params: [{
+                  chainId: MONAD_CHAIN_ID_HEX,
+                  chainName: 'Monad Testnet',
+                  rpcUrls: [RPC_URL],
+                  nativeCurrency: { name: 'MON', symbol: 'MON', decimals: 18 },
+                  blockExplorerUrls: ['https://testnet.monadexplorer.com/'],
+                }],
+              });
+            } else {
+              addLog(`Chain switch failed: ${switchError.message}`);
+              return;
+            }
+          }
+
+          // Re-check network after switch
+          const updatedNetwork = await newProvider.getNetwork();
+          if (Number(updatedNetwork.chainId) !== CHAIN_ID) {
+            addLog("Failed to switch to Monad Testnet. Please switch manually in your wallet.");
+            return;
+          }
         }
       }
 
-      const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
-      const newProvider = new ethers.BrowserProvider(window.ethereum);
       const newSigner = await newProvider.getSigner();
       setProvider(newProvider);
       setSigner(newSigner);
       setAccount(accounts[0]);
-      addLog(`Connected to ${wallet || 'Wallet'}: ${accounts[0]}`);
-      const network = await newProvider.getNetwork();
-      if (Number(network.chainId) !== CHAIN_ID) {
-        addLog(`Warning: Connected to chain ${network.chainId}, expected ${CHAIN_ID}`);
-      }
+      addLog(`Connected with ${walletName}: ${accounts[0]}`);
     } catch (error) {
-      addLog(`Wallet connection failed: ${error.message}`);
+      addLog(`Connection failed: ${error.message}`);
     }
   };
 
@@ -324,9 +346,17 @@ const App = () => {
         <h1>Monad Betting Game</h1>
         <p className="subtitle">Bet on the blockchain – Win big or go home!</p>
       </header>
-      <button className="connect-btn" onClick={connectWallet}>
-        Connect Wallet (MetaMask/OKX/Coinbase)
-      </button>
+      <div className="wallet-buttons">
+        <button className="connect-btn" onClick={() => connectWithWallet('metamask')}>
+          Connect MetaMask
+        </button>
+        <button className="connect-btn" onClick={() => connectWithWallet('okx')}>
+          Connect OKX
+        </button>
+        <button className="connect-btn" onClick={() => connectWithWallet('coinbase')}>
+          Connect Coinbase
+        </button>
+      </div>
       {account && (
         <div className="account-info">
           <p>Account: {shortenHash(account)}</p>
