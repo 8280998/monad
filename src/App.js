@@ -101,7 +101,7 @@ const DEFAULT_RPC_URL = "https://testnet-rpc.monad.xyz";
 const DEFAULT_CHAIN_ID = 10143;
 const DEFAULT_CONTRACT_ADDRESS = "0xd081Ae7bA1Ee5e872690F2cC26dfa588531eA628";
 const DEFAULT_TOKEN_ADDRESS = "0xF7C90D79a1c2EA9c9028704E1Bd1FCC3619b5a37";
-const EXPLORER_URL = "https://testnet.monadexplorer.com/tx/"; // Adjust if Monad has a different explorer
+const EXPLORER_URL = "https://explorer.monad.xyz/tx/"; // Adjust if Monad has a different explorer
 const COOLDOWN = 1; // seconds
 const BLOCK_WAIT_TIME = 2; // seconds
 
