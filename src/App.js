@@ -103,10 +103,21 @@ const RPC_URL = "https://testnet-rpc.monad.xyz";
 const CHAIN_ID = 10143;
 const CONTRACT_ADDRESS = "0xd081Ae7bA1Ee5e872690F2cC26dfa588531eA628";
 const TOKEN_ADDRESS = "0xF7C90D79a1c2EA9c9028704E1Bd1FCC3619b5a37";
+const CLAIM_CONTRACT_ADDRESS = "0xfcBA9b0ABc504bCBb89F0771833c57F17FDbdd42";
 const EXPLORER_URL = "https://testnet.monadexplorer.com/tx/";
 const COOLDOWN = 1; // seconds
 const BLOCK_WAIT_TIME = 2; // seconds
 const MONAD_CHAIN_ID_HEX = "0x2797"; // 10143 in hex
+
+const CLAIM_ABI = [
+  {
+    "inputs": [],
+    "name": "claim",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  }
+];
 
 const App = () => {
   const [betAmount, setBetAmount] = useState(100.0);
@@ -214,6 +225,23 @@ const App = () => {
       addLog(`Connected with ${walletName}: ${accounts[0]}`);
     } catch (error) {
       addLog(`Connection failed: ${error.message}`);
+    }
+  };
+
+  const claimTokens = async () => {
+    if (!signer || !account) {
+      addLog("Connect wallet first.");
+      return;
+    }
+    try {
+      const claimContract = new ethers.Contract(CLAIM_CONTRACT_ADDRESS, CLAIM_ABI, signer);
+      const tx = await claimContract.claim();
+      addLog(`Claiming tokens... Tx: ${tx.hash}`, tx.hash);
+      const receipt = await tx.wait();
+      addLog(`Claim confirmed! Block: ${receipt.blockNumber}`);
+      updateBalance();
+    } catch (error) {
+      addLog(`Claim failed: ${error.message}`);
     }
   };
 
@@ -344,7 +372,6 @@ const App = () => {
     <div className="app-container">
       <header className="app-header">
         <h1>Monad Betting Game</h1>
-        <p className="subtitle">Bet on the blockchain – Win big or go home!</p>
       </header>
       <div className="wallet-buttons">
         <button className="connect-btn" onClick={() => connectWithWallet('metamask')}>
@@ -360,12 +387,17 @@ const App = () => {
       {account && (
         <div className="account-info">
           <p>Account: {shortenHash(account)}</p>
-          <p>Balance: {balance} MON</p>
+          <p>Balance: {balance} GTK</p>
         </div>
       )}
-      <button className="instructions-btn" onClick={() => setModalIsOpen(true)}>
-        Instructions
-      </button>
+      <div className="button-group">
+        <button className="instructions-btn" onClick={() => setModalIsOpen(true)}>
+          Instructions
+        </button>
+        <button className="claim-btn" onClick={claimTokens}>
+          Claim Tokens
+        </button>
+      </div>
       <Modal
         isOpen={modalIsOpen}
         onRequestClose={() => setModalIsOpen(false)}
