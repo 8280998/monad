@@ -43,7 +43,14 @@
   margin-bottom: 20px;
 }
 
-.connect-btn, .instructions-btn, .start-btn, .stop-btn, .close-btn {
+.button-group {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  margin: 10px 0;
+}
+
+.connect-btn, .instructions-btn, .claim-btn, .start-btn, .stop-btn, .close-btn {
   background: linear-gradient(45deg, #ff6b6b, #4ecdc4);
   border: none;
   padding: 12px 24px;
@@ -55,7 +62,7 @@
   transition: transform 0.2s, box-shadow 0.2s;
 }
 
-.connect-btn:hover, .instructions-btn:hover, .start-btn:hover:not(:disabled), .stop-btn:hover:not(:disabled), .close-btn:hover {
+.connect-btn:hover, .instructions-btn:hover, .claim-btn:hover, .start-btn:hover:not(:disabled), .stop-btn:hover:not(:disabled), .close-btn:hover {
   transform: translateY(-2px);
   box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
 }
@@ -67,6 +74,11 @@
 
 .stop-btn {
   background: linear-gradient(45deg, #ff8e8e, #4ecdc4);
+}
+
+.claim-btn {
+  background: linear-gradient(45deg, #ffd700, #ffed4e);
+  color: #333;
 }
 
 .account-info {
@@ -243,5 +255,10 @@ select, .input-field {
 
   .wallet-buttons {
     flex-direction: column;
+  }
+
+  .button-group {
+    flex-direction: column;
+    gap: 5px;
   }
 }
