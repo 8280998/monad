@@ -372,6 +372,7 @@ const App = () => {
     <div className="app-container">
       <header className="app-header">
         <h1>Monad Betting Game</h1>
+        <p className="subtitle">Bet on the blockchain – Win big or go home!</p>
       </header>
       <div className="wallet-buttons">
         <button className="connect-btn" onClick={() => connectWithWallet('metamask')}>
