@@ -15,6 +15,9 @@
   },
   "eslintConfig": {
   "extends": ["react-app"],
+  "env": {
+    "es2020": true
+  },
   "parserOptions": {
     "ecmaVersion": 2020
   }
