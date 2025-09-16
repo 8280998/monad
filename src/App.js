@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import Modal from 'react-modal';
 import { ethers } from 'ethers';
+import './App.css'; // Import the new CSS for styling
 
 // Set app element for modal accessibility
 Modal.setAppElement('#root');
@@ -97,19 +98,17 @@ const ERC20_ABI = [
   }
 ];
 
-const DEFAULT_RPC_URL = "https://testnet-rpc.monad.xyz";
-const DEFAULT_CHAIN_ID = 10143;
-const DEFAULT_CONTRACT_ADDRESS = "0xd081Ae7bA1Ee5e872690F2cC26dfa588531eA628";
-const DEFAULT_TOKEN_ADDRESS = "0xF7C90D79a1c2EA9c9028704E1Bd1FCC3619b5a37";
-const EXPLORER_URL = "https://explorer.monad.xyz/tx/"; // Adjust if Monad has a different explorer
+// Hardcoded values - removed from UI
+const RPC_URL = "https://testnet-rpc.monad.xyz";
+const CHAIN_ID = 10143;
+const CONTRACT_ADDRESS = "0xd081Ae7bA1Ee5e872690F2cC26dfa588531eA628";
+const TOKEN_ADDRESS = "0xF7C90D79a1c2EA9c9028704E1Bd1FCC3619b5a37";
+const EXPLORER_URL = "https://testnet.monadexplorer.com/tx/";
 const COOLDOWN = 1; // seconds
 const BLOCK_WAIT_TIME = 2; // seconds
+const MONAD_CHAIN_ID_HEX = "0x2797"; // 10143 in hex
 
 const App = () => {
-  const [rpcUrl, setRpcUrl] = useState(DEFAULT_RPC_URL);
-  const [chainId, setChainId] = useState(DEFAULT_CHAIN_ID);
-  const [contractAddress, setContractAddress] = useState(DEFAULT_CONTRACT_ADDRESS);
-  const [tokenAddress, setTokenAddress] = useState(DEFAULT_TOKEN_ADDRESS);
   const [betAmount, setBetAmount] = useState(100.0);
   const [numBets, setNumBets] = useState(100);
   const [mode, setMode] = useState("1"); // 1: manual, 2: random
@@ -127,37 +126,78 @@ const App = () => {
     if (account && provider) {
       updateBalance();
     }
-  }, [account, provider, tokenAddress]);
+  }, [account, provider]);
 
   const addLog = (message, txHash = null) => {
     setLogs(prev => [...prev, { message, txHash }]);
   };
 
+  // Detect and prioritize wallets
+  const detectWallet = () => {
+    if (window.okxwallet) {
+      window.ethereum = window.okxwallet.ethereum;
+      return 'OKX';
+    }
+    if (typeof window.ethereum !== 'undefined') {
+      return 'MetaMask/Coinbase';
+    }
+    if (window.coinbaseWalletExtension) {
+      window.ethereum = window.coinbaseWalletExtension;
+      return 'Coinbase';
+    }
+    return null;
+  };
+
   const connectWallet = async () => {
-    if (window.ethereum) {
+    const wallet = detectWallet();
+    if (!window.ethereum) {
+      addLog("No wallet detected. Install MetaMask, OKX, or Coinbase Wallet.");
+      return;
+    }
+
+    try {
+      // Switch to Monad Testnet
       try {
-        const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
-        const newProvider = new ethers.BrowserProvider(window.ethereum);
-        const newSigner = await newProvider.getSigner();
-        setProvider(newProvider);
-        setSigner(newSigner);
-        setAccount(accounts[0]);
-        addLog(`Connected wallet: ${accounts[0]}`);
-        const network = await newProvider.getNetwork();
-        if (Number(network.chainId) !== chainId) {
-          addLog(`Warning: Connected to chain ${network.chainId}, expected ${chainId}`);
+        await window.ethereum.request({
+          method: 'wallet_switchEthereumChain',
+          params: [{ chainId: MONAD_CHAIN_ID_HEX }],
+        });
+      } catch (switchError) {
+        if (switchError.code === 4902) { // Chain not added
+          await window.ethereum.request({
+            method: 'wallet_addEthereumChain',
+            params: [{
+              chainId: MONAD_CHAIN_ID_HEX,
+              chainName: 'Monad Testnet',
+              rpcUrls: [RPC_URL],
+              nativeCurrency: { name: 'MON', symbol: 'MON', decimals: 18 },
+              blockExplorerUrls: ['https://testnet.monadexplorer.com/'],
+            }],
+          });
+        } else {
+          throw switchError;
         }
-      } catch (error) {
-        addLog(`Wallet connection failed: ${error.message}`);
       }
-    } else {
-      addLog("No wallet detected. Install MetaMask, Coinbase Wallet, or OKX Wallet.");
+
+      const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+      const newProvider = new ethers.BrowserProvider(window.ethereum);
+      const newSigner = await newProvider.getSigner();
+      setProvider(newProvider);
+      setSigner(newSigner);
+      setAccount(accounts[0]);
+      addLog(`Connected to ${wallet || 'Wallet'}: ${accounts[0]}`);
+      const network = await newProvider.getNetwork();
+      if (Number(network.chainId) !== CHAIN_ID) {
+        addLog(`Warning: Connected to chain ${network.chainId}, expected ${CHAIN_ID}`);
+      }
+    } catch (error) {
+      addLog(`Wallet connection failed: ${error.message}`);
     }
   };
 
   const updateBalance = async () => {
     try {
-      const tokenContract = new ethers.Contract(tokenAddress, ERC20_ABI, provider);
+      const tokenContract = new ethers.Contract(TOKEN_ADDRESS, ERC20_ABI, provider);
       const bal = await tokenContract.balanceOf(account);
       setBalance(ethers.formatEther(bal));
     } catch (error) {
@@ -248,9 +288,9 @@ const App = () => {
     setIsBetting(true);
     setStopRequested(false);
     try {
-      const contract = new ethers.Contract(contractAddress, CONTRACT_ABI, signer);
-      const tokenContract = new ethers.Contract(tokenAddress, ERC20_ABI, signer);
-      await approveToken(contractAddress, tokenContract);
+      const contract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer);
+      const tokenContract = new ethers.Contract(TOKEN_ADDRESS, ERC20_ABI, signer);
+      await approveToken(CONTRACT_ADDRESS, tokenContract);
 
       for (let i = 0; i < numBets; i++) {
         if (stopRequested) break;
@@ -279,68 +319,110 @@ const App = () => {
   const possibleGuesses = '0123456789abcdef'.split('');
 
   return (
-    <div style={{ padding: '20px', maxWidth: '800px', margin: 'auto', fontFamily: 'Arial' }}>
-      <h1>Monad Betting Game</h1>
-      <button onClick={connectWallet}>Connect Wallet (MetaMask/Coinbase/OKX)</button>
-      {account && <p>Account: {shortenHash(account)} | Balance: {balance} tokens</p>}
-      <button onClick={() => setModalIsOpen(true)}>Instructions</button>
-      <Modal isOpen={modalIsOpen} onRequestClose={() => setModalIsOpen(false)} style={{ content: { maxWidth: '600px', margin: 'auto' } }}>
+    <div className="app-container">
+      <header className="app-header">
+        <h1>Monad Betting Game</h1>
+        <p className="subtitle">Bet on the blockchain – Win big or go home!</p>
+      </header>
+      <button className="connect-btn" onClick={connectWallet}>
+        Connect Wallet (MetaMask/OKX/Coinbase)
+      </button>
+      {account && (
+        <div className="account-info">
+          <p>Account: {shortenHash(account)}</p>
+          <p>Balance: {balance} MON</p>
+        </div>
+      )}
+      <button className="instructions-btn" onClick={() => setModalIsOpen(true)}>
+        Instructions
+      </button>
+      <Modal
+        isOpen={modalIsOpen}
+        onRequestClose={() => setModalIsOpen(false)}
+        className="modal-content"
+        overlayClassName="modal-overlay"
+      >
         <h2>Game Instructions</h2>
         <p>针对竞猜所在区块哈希尾号内容的字符值，猜0-9 或 a-f</p>
         <p>竞猜正确赢得投注额 *12 倍奖励，竞猜错误失去投注额币</p>
         <p>交易哈希值不是区块哈希值，区块哈希可包含多个交易哈希</p>
         <p>为保证公平公开透明，仅针对竞猜时产生的区块哈希尾号值</p>
-        <button onClick={() => setModalIsOpen(false)}>Close</button>
+        <button className="close-btn" onClick={() => setModalIsOpen(false)}>
+          Close
+        </button>
       </Modal>
 
-      <div style={{ marginTop: '20px' }}>
-        <label>RPC URL: <input value={rpcUrl} onChange={e => setRpcUrl(e.target.value)} style={{ width: '100%' }} /></label>
+      <div className="betting-section">
+        <div className="mode-selector">
+          <label>Bet Mode:</label>
+          <select value={mode} onChange={e => setMode(e.target.value)}>
+            <option value="1">Manual</option>
+            <option value="2">Random</option>
+          </select>
+        </div>
+        {mode === '1' && (
+          <div className="guess-selector">
+            <label>Guess:</label>
+            <div className="guess-buttons">
+              {possibleGuesses.map(g => (
+                <button
+                  key={g}
+                  onClick={() => setGuess(g)}
+                  className={`guess-btn ${guess === g ? 'active' : ''}`}
+                >
+                  {g}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+        <div className="input-group">
+          <label>Bet Amount (MON):</label>
+          <input
+            type="number"
+            value={betAmount}
+            onChange={e => setBetAmount(Number(e.target.value))}
+            className="input-field"
+          />
+        </div>
+        <div className="input-group">
+          <label>Number of Bets:</label>
+          <input
+            type="number"
+            value={numBets}
+            onChange={e => setNumBets(Number(e.target.value))}
+            className="input-field"
+          />
+        </div>
+        <div className="bet-buttons">
+          <button onClick={startBetting} disabled={isBetting} className="start-btn">
+            Start Betting
+          </button>
+          <button onClick={stopBetting} disabled={!isBetting} className="stop-btn">
+            Stop Betting
+          </button>
+        </div>
       </div>
-      <div>
-        <label>Chain ID: <input type="number" value={chainId} onChange={e => setChainId(Number(e.target.value))} /></label>
-      </div>
-      <div>
-        <label>Contract Address: <input value={contractAddress} onChange={e => setContractAddress(e.target.value)} style={{ width: '100%' }} /></label>
-      </div>
-      <div>
-        <label>Token Address: <input value={tokenAddress} onChange={e => setTokenAddress(e.target.value)} style={{ width: '100%' }} /></label>
-      </div>
-      <div>
-        <label>Bet Mode: </label>
-        <select value={mode} onChange={e => setMode(e.target.value)}>
-          <option value="1">Manual</option>
-          <option value="2">Random</option>
-        </select>
-      </div>
-      {mode === '1' && (
-        <div>
-          <label>Guess: </label>
-          {possibleGuesses.map(g => (
-            <button key={g} onClick={() => setGuess(g)} style={{ background: guess === g ? 'lightblue' : 'white', margin: '5px' }}>{g}</button>
+
+      <div className="logs-section">
+        <h2>Transaction Logs</h2>
+        <div className="logs-container">
+          {logs.map((log, i) => (
+            <div key={i} className="log-entry">
+              <span className="log-message">{log.message}</span>
+              {log.txHash && (
+                <a
+                  href={`${EXPLORER_URL}${log.txHash}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="tx-link"
+                >
+                  {shortenHash(log.txHash)}
+                </a>
+              )}
+            </div>
           ))}
         </div>
-      )}
-      <div>
-        <label>Bet Amount: <input type="number" value={betAmount} onChange={e => setBetAmount(Number(e.target.value))} /></label>
-      </div>
-      <div>
-        <label>Number of Bets: <input type="number" value={numBets} onChange={e => setNumBets(Number(e.target.value))} /></label>
-      </div>
-      <button onClick={startBetting} disabled={isBetting}>Start Betting</button>
-      <button onClick={stopBetting} disabled={!isBetting}>Stop Betting</button>
-
-      <h2>Logs</h2>
-      <div style={{ border: '1px solid #ccc', height: '300px', overflowY: 'scroll', padding: '10px', wordBreak: 'break-all' }}>
-        {logs.map((log, i) => (
-          <p key={i}>
-            {log.message}
-            {log.txHash && (
-              <> <a href={`${EXPLORER_URL}${log.txHash}`} target="_blank" rel="noopener noreferrer">
-                {shortenHash(log.txHash)}
-              </a></>
-            )}
-          </p>
-        ))}
       </div>
     </div>
   );
