@@ -46,11 +46,45 @@
 .button-group {
   display: flex;
   justify-content: center;
-  gap: 10px;
   margin: 10px 0;
 }
 
-.connect-btn, .instructions-btn, .claim-btn, .start-btn, .stop-btn, .close-btn {
+.instructions-btn {
+  background: linear-gradient(to right, #ff6b6b, #4ecdc4);
+  border: none;
+  padding: 12px 24px;
+  color: white;
+  font-size: 1em;
+  cursor: pointer;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+  transition: transform 0.2s, box-shadow 0.2s;
+  border-top-left-radius: 50px;
+  border-bottom-left-radius: 50px;
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+.claim-btn {
+  background: white;
+  border: none;
+  padding: 12px 24px;
+  color: black;
+  font-size: 1em;
+  cursor: pointer;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+  transition: transform 0.2s, box-shadow 0.2s;
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+  border-top-right-radius: 50px;
+  border-bottom-right-radius: 50px;
+}
+
+.instructions-btn:hover, .claim-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+}
+
+.connect-btn, .start-btn, .stop-btn, .close-btn {
   background: linear-gradient(45deg, #ff6b6b, #4ecdc4);
   border: none;
   padding: 12px 24px;
@@ -62,7 +96,7 @@
   transition: transform 0.2s, box-shadow 0.2s;
 }
 
-.connect-btn:hover, .instructions-btn:hover, .claim-btn:hover, .start-btn:hover:not(:disabled), .stop-btn:hover:not(:disabled), .close-btn:hover {
+.connect-btn:hover, .start-btn:hover:not(:disabled), .stop-btn:hover:not(:disabled), .close-btn:hover {
   transform: translateY(-2px);
   box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
 }
@@ -74,11 +108,6 @@
 
 .stop-btn {
   background: linear-gradient(45deg, #ff8e8e, #4ecdc4);
-}
-
-.claim-btn {
-  background: linear-gradient(45deg, #ffd700, #ffed4e);
-  color: #333;
 }
 
 .account-info {
@@ -258,7 +287,7 @@ select, .input-field {
   }
 
   .button-group {
-    flex-direction: column;
-    gap: 5px;
+    flex-direction: row;
+    justify-content: center;
   }
 }
