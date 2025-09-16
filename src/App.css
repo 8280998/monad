@@ -1,4 +1,4 @@
-/* src/App.css - Added for a more stylish, "cool" UI with gradients, shadows, and animations */
+/* src/App.css - Stylish UI with gradients, shadows, and animations */
 
 .app-container {
   max-width: 800px;
@@ -35,6 +35,14 @@
   margin-top: -10px;
 }
 
+.wallet-buttons {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
 .connect-btn, .instructions-btn, .start-btn, .stop-btn, .close-btn {
   background: linear-gradient(45deg, #ff6b6b, #4ecdc4);
   border: none;
@@ -45,7 +53,6 @@
   cursor: pointer;
   box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
   transition: transform 0.2s, box-shadow 0.2s;
-  margin: 10px;
 }
 
 .connect-btn:hover, .instructions-btn:hover, .start-btn:hover:not(:disabled), .stop-btn:hover:not(:disabled), .close-btn:hover {
@@ -53,12 +60,7 @@
   box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
 }
 
-.start-btn:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-.stop-btn:disabled {
+.start-btn:disabled, .stop-btn:disabled {
   opacity: 0.6;
   cursor: not-allowed;
 }
@@ -73,7 +75,6 @@
   border-radius: 10px;
   margin: 10px 0;
   text-align: center;
-  backdrop-filter: blur(10px);
 }
 
 .betting-section {
@@ -81,7 +82,6 @@
   padding: 20px;
   border-radius: 15px;
   margin: 20px 0;
-  backdrop-filter: blur(10px);
 }
 
 .mode-selector, .input-group {
@@ -192,7 +192,6 @@ select, .input-field {
   height: 300px;
   overflow-y: scroll;
   padding: 15px;
-  backdrop-filter: blur(5px);
 }
 
 .log-entry {
@@ -239,6 +238,10 @@ select, .input-field {
   }
 
   .bet-buttons {
+    flex-direction: column;
+  }
+
+  .wallet-buttons {
     flex-direction: column;
   }
 }
