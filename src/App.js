@@ -135,10 +135,15 @@ const App = () => {
   const [visitorCount, setVisitorCount] = useState('?');
 
   useEffect(() => {
-    // Use countapi.xyz for reliable visitor counting
-    fetch('https://api.countapi.xyz/hit/monadbettingapp.app/visitor')
+    fetch('https://visitor.6developer.com/visit', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        domain: 'monadbettingapp',
+      })
+    })
       .then(res => res.json())
-      .then(data => setVisitorCount(data.value || '?'))
+      .then(data => setVisitorCount(data.totalCount || '?'))
       .catch(() => setVisitorCount('?'));
   }, []);
 
@@ -305,7 +310,6 @@ const App = () => {
   const resolveBet = async (contract, betId) => {
     try {
       const tx = await contract.resolveBet(BigInt(betId));
-      // No resolving log
       const receipt = await tx.wait();
       const bet = await contract.getBet(BigInt(betId));
       const won = bet[4];
