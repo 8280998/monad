@@ -108,7 +108,6 @@ const EXPLORER_URL = "https://testnet.monadexplorer.com";
 const COOLDOWN = 1; // seconds
 const BLOCK_WAIT_TIME = 2; // seconds
 const MONAD_CHAIN_ID_HEX = "0x2797"; // 10143 in hex
-const VISITOR_COUNTER_KEY = 'monadbettingapp'; // Key for counter API
 
 const CLAIM_ABI = [
   {
@@ -136,9 +135,10 @@ const App = () => {
   const [visitorCount, setVisitorCount] = useState('?');
 
   useEffect(() => {
-    fetch(`https://count.jasoncameron.dev/increment?key=${VISITOR_COUNTER_KEY}`)
+    // Use countapi.xyz for reliable visitor counting
+    fetch('https://api.countapi.xyz/hit/monadbettingapp.app/visitor')
       .then(res => res.json())
-      .then(data => setVisitorCount(data.count))
+      .then(data => setVisitorCount(data.value || '?'))
       .catch(() => setVisitorCount('?'));
   }, []);
 
@@ -511,7 +511,7 @@ const App = () => {
                     {log.blockNumber}
                   </a>
                   Hash: 
-                  <a href={`${EXPLORER_URL}/block/${log.blockHash}`} target="_blank" rel="noopener noreferrer" className="tx-link">
+                  <a href={`${EXPLORER_URL}/block/${log.blockNumber}`} target="_blank" rel="noopener noreferrer" className="tx-link">
                     {shortenHash(log.blockHash)}
                   </a>, Target Byte: {log.targetByte}
                 </p>
