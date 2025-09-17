@@ -153,6 +153,29 @@ const App = () => {
     }
   }, [account, provider]);
 
+  // 新增：监听网络变化
+  useEffect(() => {
+    if (!provider) return;
+
+    const handleChainChanged = async (chainId) => {
+      const newChainId = parseInt(chainId, 16); // Hex to decimal
+      if (newChainId === CHAIN_ID) {
+        addLog({type: 'simple', message: "Network switched to Monad Testnet."});
+        if (account) {
+          updateBalance();
+        }
+      } else {
+        addLog({type: 'simple', message: "Switched to a different network. Please switch back to Monad Testnet."});
+      }
+    };
+
+    provider.provider.on('chainChanged', handleChainChanged);
+
+    return () => {
+      provider.provider.removeListener('chainChanged', handleChainChanged);
+    };
+  }, [provider, account]);
+
   const addLog = (logEntry) => {
     setLogs(prev => [...prev, logEntry]);
   };
@@ -190,42 +213,41 @@ const App = () => {
       const newProvider = new ethers.BrowserProvider(ethereumProvider);
       const network = await newProvider.getNetwork();
 
-      const isCoinbase = walletType === 'coinbase';
-
+      // 统一尝试切换到 Monad 测试网（适用于所有钱包）
       if (Number(network.chainId) !== CHAIN_ID) {
-        if (isCoinbase) {
-          addLog({type: 'simple', message: "Coinbase Wallet detected: Please add Monad Testnet manually in your wallet settings."});
-          addLog({type: 'simple', message: "Network details: Chain ID: 10143, RPC: https://testnet-rpc.monad.xyz, Symbol: MON, Explorer: https://testnet.monadexplorer.com"});
-        } else {
-          try {
+        addLog({type: 'simple', message: `Detected wallet: ${walletName}. Switching to Monad Testnet...`});
+        try {
+          await ethereumProvider.request({
+            method: 'wallet_switchEthereumChain',
+            params: [{ chainId: MONAD_CHAIN_ID_HEX }],
+          });
+        } catch (switchError) {
+          if (switchError.code === 4902) {
             await ethereumProvider.request({
-              method: 'wallet_switchEthereumChain',
-              params: [{ chainId: MONAD_CHAIN_ID_HEX }],
+              method: 'wallet_addEthereumChain',
+              params: [{
+                chainId: MONAD_CHAIN_ID_HEX,
+                chainName: 'Monad Testnet',
+                rpcUrls: [RPC_URL],
+                nativeCurrency: { name: 'MON', symbol: 'MON', decimals: 18 },
+                blockExplorerUrls: ['https://testnet.monadexplorer.com/'],
+              }],
             });
-          } catch (switchError) {
-            if (switchError.code === 4902) {
-              await ethereumProvider.request({
-                method: 'wallet_addEthereumChain',
-                params: [{
-                  chainId: MONAD_CHAIN_ID_HEX,
-                  chainName: 'Monad Testnet',
-                  rpcUrls: [RPC_URL],
-                  nativeCurrency: { name: 'MON', symbol: 'MON', decimals: 18 },
-                  blockExplorerUrls: ['https://testnet.monadexplorer.com/'],
-                }],
-              });
-            } else {
-              addLog({type: 'simple', message: `Chain switch failed: ${switchError.message}`});
-              return;
-            }
-          }
-
-          const updatedNetwork = await newProvider.getNetwork();
-          if (Number(updatedNetwork.chainId) !== CHAIN_ID) {
-            addLog({type: 'simple', message: "Failed to switch to Monad Testnet. Please switch manually in your wallet."});
+          } else {
+            addLog({type: 'simple', message: `Auto-switch failed for ${walletName}: ${switchError.message}`});
+            addLog({type: 'simple', message: "Please add Monad Testnet manually in your wallet settings."});
+            addLog({type: 'simple', message: "Network details: Chain ID: 10143, RPC: https://testnet-rpc.monad.xyz, Symbol: MON, Explorer: https://testnet.monadexplorer.com"});
             return;
           }
         }
+
+        const updatedNetwork = await newProvider.getNetwork();
+        if (Number(updatedNetwork.chainId) !== CHAIN_ID) {
+          addLog({type: 'simple', message: `Failed to switch to Monad Testnet in ${walletName}. Please switch manually.`});
+          addLog({type: 'simple', message: "Network details: Chain ID: 10143, RPC: https://testnet-rpc.monad.xyz, Symbol: MON, Explorer: https://testnet.monadexplorer.com"});
+          return;
+        }
+        addLog({type: 'simple', message: "Successfully switched to Monad Testnet!"});
       }
 
       const newSigner = await newProvider.getSigner();
