@@ -7,4 +7,7 @@ monad测试游戏
 界面待优化：
 <img width="1234" height="1296" alt="image" src="https://github.com/user-attachments/assets/45a3b50a-fbd1-43ee-a094-b6405b02e508" />
 
+界面做了更新，添加了领取游戏币的功能，每个地址只能领取10000个
+<img width="1116" height="1378" alt="image" src="https://github.com/user-attachments/assets/d071418e-b9db-4a9c-bc4d-7113d8304b9c" />
+
 
