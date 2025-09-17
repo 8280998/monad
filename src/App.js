@@ -153,6 +153,7 @@ const App = () => {
     }
   }, [account, provider]);
 
+  // 新增：监听网络变化
   useEffect(() => {
     if (!provider) return;
 
@@ -212,6 +213,7 @@ const App = () => {
       const newProvider = new ethers.BrowserProvider(ethereumProvider);
       const network = await newProvider.getNetwork();
 
+      // 统一尝试切换到 Monad 测试网（适用于所有钱包）
       if (Number(network.chainId) !== CHAIN_ID) {
         addLog({type: 'simple', message: `Detected wallet: ${walletName}. Switching to Monad Testnet...`});
         let switchSuccess = false;
@@ -222,7 +224,7 @@ const App = () => {
           });
           switchSuccess = true;
         } catch (switchError) {
-          if (switchError.code === 4902) {
+          if (switchError.code === 4902) { // 链不存在，尝试添加
             try {
               await ethereumProvider.request({
                 method: 'wallet_addEthereumChain',
@@ -254,7 +256,7 @@ const App = () => {
           await new Promise(resolve => setTimeout(resolve, 1000));
         }
 
-
+        // 切换/添加后，重新检查网络
         const updatedNetwork = await newProvider.getNetwork();
         if (Number(updatedNetwork.chainId) !== CHAIN_ID) {
           addLog({type: 'simple', message: `Failed to switch to Monad Testnet in ${walletName}. Please switch manually.`});
@@ -283,7 +285,7 @@ const App = () => {
     }
     try {
       const claimContract = new ethers.Contract(CLAIM_CONTRACT_ADDRESS, CLAIM_ABI, signer);
-      const tx = await claimContract.claim();
+      const tx = await claimContract.claim({ gasLimit: 100000 }); // 添加 gasLimit 以优化
       addLog({type: 'tx', message: `Claiming tokens... Tx: `, txHash: tx.hash});
       const receipt = await tx.wait();
       addLog({type: 'simple', message: `Claim confirmed! Block: ${receipt.blockNumber}`});
@@ -308,7 +310,7 @@ const App = () => {
       const allowance = await tokenContract.allowance(account, contractAddr);
       const required = ethers.parseEther(betAmount.toString()) * BigInt(numBets);
       if (allowance < required) {
-        const tx = await tokenContract.approve(contractAddr, ethers.MaxUint256);
+        const tx = await tokenContract.approve(contractAddr, ethers.MaxUint256, { gasLimit: 50000 }); // 添加 gasLimit
         addLog({type: 'tx', message: `Approving tokens... Tx: `, txHash: tx.hash});
         await tx.wait();
         addLog({type: 'simple', message: `Approval confirmed.`});
@@ -322,7 +324,7 @@ const App = () => {
   const placeBet = async (contract, currentGuess) => {
     try {
       const amountWei = ethers.parseEther(betAmount.toString());
-      const tx = await contract.placeBet(currentGuess, amountWei);
+      const tx = await contract.placeBet(currentGuess, amountWei, { gasLimit: 200000 }); // 添加 gasLimit
       addLog({type: 'tx', message: `Placing bet with guess ${currentGuess}... Tx: `, txHash: tx.hash});
       const receipt = await tx.wait();
       const iface = new ethers.Interface(CONTRACT_ABI);
@@ -347,7 +349,7 @@ const App = () => {
 
   const resolveBet = async (contract, betId) => {
     try {
-      const tx = await contract.resolveBet(BigInt(betId));
+      const tx = await contract.resolveBet(BigInt(betId), { gasLimit: 200000 }); // 添加 gasLimit
       const receipt = await tx.wait();
       const bet = await contract.getBet(BigInt(betId));
       const won = bet[4];
