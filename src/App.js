@@ -281,14 +281,38 @@ const App = () => {
       return;
     }
     try {
+      const nativeBalance = await provider.getBalance(account);
+      const nativeBalanceEth = ethers.formatEther(nativeBalance);
+      addLog({type: 'simple', message: `Current native balance: ${nativeBalanceEth} MON`});
+
       const claimContract = new ethers.Contract(CLAIM_CONTRACT_ADDRESS, CLAIM_ABI, signer);
-      const tx = await claimContract.claim({ gasLimit: 500000 });
+      
+      const estimatedGas = await claimContract.claim.estimateGas();
+      const gasLimit = estimatedGas * 140n / 100n;
+      addLog({type: 'simple', message: `Estimated gas: ${estimatedGas}, Using gas limit: ${gasLimit}`});
+
+      const gasPrice = await provider.getFeeData();
+      const estimatedFee = ethers.formatEther(estimatedGas * gasPrice.gasPrice);
+      addLog({type: 'simple', message: `Estimated gas fee: ~${estimatedFee} MON`});
+
+      if (parseFloat(nativeBalanceEth) < parseFloat(estimatedFee) * 1.4) { // 40% buffer
+        addLog({type: 'simple', message: `Insufficient native balance for gas. Need at least ~${(parseFloat(estimatedFee) * 1.4).toFixed(6)} MON`});
+        return;
+      }
+
+      const tx = await claimContract.claim({ gasLimit });
       addLog({type: 'tx', message: `Claiming tokens... Tx: `, txHash: tx.hash});
       const receipt = await tx.wait();
-      addLog({type: 'simple', message: `Claim confirmed! Block: ${receipt.blockNumber}`});
+      addLog({type: 'simple', message: `Claim confirmed! Block: ${receipt.blockNumber}, Gas used: ${receipt.gasUsed}, Fee: ${ethers.formatEther(receipt.gasUsed * receipt.gasPrice)} MON`});
       updateBalance();
     } catch (error) {
       addLog({type: 'simple', message: `Claim failed: ${error.message}`});
+      if (error.reason) {
+        addLog({type: 'simple', message: `Error reason: ${error.reason}`});
+      }
+      if (error.data) {
+        addLog({type: 'simple', message: `Error data: ${error.data}`});
+      }
     }
   };
 
@@ -307,7 +331,10 @@ const App = () => {
       const allowance = await tokenContract.allowance(account, contractAddr);
       const required = ethers.parseEther(betAmount.toString()) * BigInt(numBets);
       if (allowance < required) {
-        const tx = await tokenContract.approve(contractAddr, ethers.MaxUint256, { gasLimit: 500000 });
+
+        const estimatedGas = await tokenContract.approve.estimateGas(contractAddr, ethers.MaxUint256);
+        const gasLimit = estimatedGas * 120n / 100n;
+        const tx = await tokenContract.approve(contractAddr, ethers.MaxUint256, { gasLimit });
         addLog({type: 'tx', message: `Approving tokens... Tx: `, txHash: tx.hash});
         await tx.wait();
         addLog({type: 'simple', message: `Approval confirmed.`});
@@ -321,7 +348,10 @@ const App = () => {
   const placeBet = async (contract, currentGuess) => {
     try {
       const amountWei = ethers.parseEther(betAmount.toString());
-      const tx = await contract.placeBet(currentGuess, amountWei, { gasLimit: 500000 }); // 添加 gasLimit
+
+      const estimatedGas = await contract.placeBet.estimateGas(currentGuess, amountWei);
+      const gasLimit = estimatedGas * 120n / 100n;
+      const tx = await contract.placeBet(currentGuess, amountWei, { gasLimit });
       addLog({type: 'tx', message: `Placing bet with guess ${currentGuess}... Tx: `, txHash: tx.hash});
       const receipt = await tx.wait();
       const iface = new ethers.Interface(CONTRACT_ABI);
@@ -346,7 +376,9 @@ const App = () => {
 
   const resolveBet = async (contract, betId) => {
     try {
-      const tx = await contract.resolveBet(BigInt(betId), { gasLimit: 500000 });
+      const estimatedGas = await contract.resolveBet.estimateGas(BigInt(betId));
+      const gasLimit = estimatedGas * 120n / 100n;
+      const tx = await contract.resolveBet(BigInt(betId), { gasLimit });
       const receipt = await tx.wait();
       const bet = await contract.getBet(BigInt(betId));
       const won = bet[4];
