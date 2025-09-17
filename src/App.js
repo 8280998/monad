@@ -121,7 +121,7 @@ const CLAIM_ABI = [
 
 const App = () => {
   const [betAmount, setBetAmount] = useState(100.0);
-  const [numBets, setNumBets] = useState(100);
+  const [numBets, setNumBets] = useState(1);
   const [mode, setMode] = useState("1"); // 1: manual, 2: random
   const [guess, setGuess] = useState("0");
   const [provider, setProvider] = useState(null);
@@ -393,7 +393,7 @@ const App = () => {
       {account && (
         <div className="account-info">
           <p>Account: {shortenHash(account)}</p>
-          <p>Balance: {balance} MON</p>
+          <p>Balance: {balance} GTK</p>
         </div>
       )}
       <div className="button-group">
@@ -446,7 +446,7 @@ const App = () => {
         )}
         <div className="input-row">
           <div className="input-group">
-            <label>Bet Amount (MON):</label>
+            <label>Bet Amount (GTK):</label>
             <input
               type="number"
               value={betAmount}
@@ -475,7 +475,7 @@ const App = () => {
       </div>
 
       <div className="logs-section">
-        <h2>Transaction Logs</h2>
+        <h2>Bet Logs</h2>
         <div className="logs-container">
           {logs.map((log, i) => {
             if (log.type === 'simple') {
