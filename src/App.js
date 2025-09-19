@@ -128,6 +128,7 @@ const App = () => {
   const [signer, setSigner] = useState(null);
   const [account, setAccount] = useState(null);
   const [balance, setBalance] = useState(0);
+  const [contractBalance, setContractBalance] = useState(0);
   const [logs, setLogs] = useState([]);
   const [isBetting, setIsBetting] = useState(false);
   const [stopRequested, setStopRequested] = useState(false);
@@ -139,7 +140,7 @@ const App = () => {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        domain: 'monadbettingapp',
+        domain: 'monad-bet-game.vercel.app',
       })
     })
       .then(res => res.json())
@@ -150,6 +151,7 @@ const App = () => {
   useEffect(() => {
     if (account && provider) {
       updateBalance();
+      updateContractBalance();
     }
   }, [account, provider]);
 
@@ -162,16 +164,34 @@ const App = () => {
         addLog({type: 'simple', message: "Network switched to Monad Testnet."});
         if (account) {
           updateBalance();
+          updateContractBalance();
         }
       } else {
-        addLog({type: 'simple', message: "Switched to a different network. Please switch back to Monad Testnet."});
+        addLog({type: 'simple', message: "Switched to a different network. Please switch back to  Monad Testnet."});
+      }
+    };
+
+    const handleAccountsChanged = (accounts) => {
+      if (accounts.length > 0) {
+        setAccount(accounts[0]);
+        updateBalance();
+        updateContractBalance();
+      } else {
+        setAccount(null);
+        setSigner(null);
+        setProvider(null);
+        setBalance(0);
+        setContractBalance(0);
+        addLog({type: 'simple', message: "Wallet disconnected."});
       }
     };
 
     provider.provider.on('chainChanged', handleChainChanged);
+    provider.provider.on('accountsChanged', handleAccountsChanged);
 
     return () => {
       provider.provider.removeListener('chainChanged', handleChainChanged);
+      provider.provider.removeListener('accountsChanged', handleAccountsChanged);
     };
   }, [provider, account]);
 
@@ -228,7 +248,7 @@ const App = () => {
                 method: 'wallet_addEthereumChain',
                 params: [{
                   chainId: MONAD_CHAIN_ID_HEX,
-                  chainName: 'Monad Testnet',
+                  chainName: '',
                   rpcUrls: [RPC_URL],
                   nativeCurrency: { name: 'MON', symbol: 'MON', decimals: 18 },
                   blockExplorerUrls: ['https://testnet.monadexplorer.com/'],
@@ -250,18 +270,18 @@ const App = () => {
         }
 
         if (switchSuccess) {
-          // Add a short delay to allow the wallet to update
-          await new Promise(resolve => setTimeout(resolve, 1000));
+          // Add a longer delay to allow the wallet to fully update after switch
+          await new Promise(resolve => setTimeout(resolve, 2000));
         }
 
         const updatedNetwork = await newProvider.getNetwork();
         if (Number(updatedNetwork.chainId) !== CHAIN_ID) {
-          addLog({type: 'simple', message: `Failed to switch to Monad Testnet in ${walletName}. Please switch manually.`});
+          addLog({type: 'simple', message: `Failed to switch to MONAD in ${walletName}. Please switch manually.`});
           addLog({type: 'simple', message: "Network details: Chain ID: 10143, RPC: https://testnet-rpc.monad.xyz, Symbol: MON, Explorer: https://testnet.monadexplorer.com"});
           // Proceed with connection but warn
           addLog({type: 'simple', message: "Connected anyway. Please switch network manually in wallet to use the app fully."});
         } else {
-          addLog({type: 'simple', message: "Successfully switched to Monad Testnet!"});
+          addLog({type: 'simple', message: "Successfully switched to MONAD!"});
         }
       }
 
@@ -270,6 +290,14 @@ const App = () => {
       setSigner(newSigner);
       setAccount(accounts[0]);
       addLog({type: 'simple', message: `Connected with ${walletName}: ${accounts[0]}`});
+
+      // Force balance update after state settles
+      setTimeout(() => {
+        if (provider && account) {
+          updateBalance();
+          updateContractBalance();
+        }
+      }, 1000);
     } catch (error) {
       addLog({type: 'simple', message: `Connection failed: ${error.message}`});
     }
@@ -288,23 +316,28 @@ const App = () => {
       const claimContract = new ethers.Contract(CLAIM_CONTRACT_ADDRESS, CLAIM_ABI, signer);
       
       const estimatedGas = await claimContract.claim.estimateGas();
-      const gasLimit = estimatedGas * 140n / 100n;
+      const gasLimit = estimatedGas * 120n / 100n;
       addLog({type: 'simple', message: `Estimated gas: ${estimatedGas}, Using gas limit: ${gasLimit}`});
 
       const gasPrice = await provider.getFeeData();
       const estimatedFee = ethers.formatEther(estimatedGas * gasPrice.gasPrice);
       addLog({type: 'simple', message: `Estimated gas fee: ~${estimatedFee} MON`});
 
-      if (parseFloat(nativeBalanceEth) < parseFloat(estimatedFee) * 1.4) { // 40% buffer
-        addLog({type: 'simple', message: `Insufficient native balance for gas. Need at least ~${(parseFloat(estimatedFee) * 1.4).toFixed(6)} MON`});
+      if (parseFloat(nativeBalanceEth) < parseFloat(estimatedFee) * 1.2) { // 20% buffer
+        addLog({type: 'simple', message: `Insufficient native balance for gas. Need at least ~${(parseFloat(estimatedFee) * 1.2).toFixed(6)} MON`});
         return;
       }
 
       const tx = await claimContract.claim({ gasLimit });
       addLog({type: 'tx', message: `Claiming tokens... Tx: `, txHash: tx.hash});
-      const receipt = await tx.wait();
-      addLog({type: 'simple', message: `Claim confirmed! Block: ${receipt.blockNumber}, Gas used: ${receipt.gasUsed}, Fee: ${ethers.formatEther(receipt.gasUsed * receipt.gasPrice)} MON`});
-      updateBalance();
+      const receipt = await tx.wait(2);  // 2 blocks
+      addLog({type: 'simple', message: `Claim confirmed! Block: ${receipt.blockNumber}, Gas used: ${receipt.gasUsed}, Fee: ${ethers.formatEther(receipt.gasUsed * receipt.gasPrice)} ETH`});
+      
+      // Force balance update after claim with delay for RPC sync
+      setTimeout(() => {
+        updateBalance();
+        updateContractBalance();
+      }, 2000);
     } catch (error) {
       addLog({type: 'simple', message: `Claim failed: ${error.message}`});
       if (error.reason) {
@@ -326,6 +359,16 @@ const App = () => {
     }
   };
 
+  const updateContractBalance = async () => {
+    try {
+      const tokenContract = new ethers.Contract(TOKEN_ADDRESS, ERC20_ABI, provider);
+      const bal = await tokenContract.balanceOf(CONTRACT_ADDRESS);
+      setContractBalance(ethers.formatEther(bal));
+    } catch (error) {
+      addLog({type: 'simple', message: `Failed to fetch contract balance: ${error.message}`});
+    }
+  };
+
   const approveToken = async (contractAddr, tokenContract) => {
     try {
       const allowance = await tokenContract.allowance(account, contractAddr);
@@ -336,7 +379,7 @@ const App = () => {
         const gasLimit = estimatedGas * 120n / 100n;
         const tx = await tokenContract.approve(contractAddr, ethers.MaxUint256, { gasLimit });
         addLog({type: 'tx', message: `Approving tokens... Tx: `, txHash: tx.hash});
-        await tx.wait();
+        await tx.wait(2);  // 2 blocks
         addLog({type: 'simple', message: `Approval confirmed.`});
       }
     } catch (error) {
@@ -345,7 +388,7 @@ const App = () => {
     }
   };
 
-  const placeBet = async (contract, currentGuess) => {
+  const placeBet = async (contract, currentGuess, retryCount = 0) => {
     try {
       const amountWei = ethers.parseEther(betAmount.toString());
 
@@ -369,6 +412,11 @@ const App = () => {
       addLog({type: 'betPlaced', betId: betId.toString(), blockNumber: receipt.blockNumber});
       return { receipt, txHash: tx.hash, betId: betId.toString() };
     } catch (error) {
+      if (error.message.includes('Insufficient allowance') && retryCount < 1) {
+        addLog({type: 'simple', message: `Allowance sync delay detected, retrying bet...`});
+        await new Promise(resolve => setTimeout(resolve, 2000));  // 2s
+        return placeBet(contract, currentGuess, retryCount + 1);
+      }
       addLog({type: 'simple', message: `Place bet failed: ${error.message}`});
       throw error;
     }
@@ -415,6 +463,17 @@ const App = () => {
       const tokenContract = new ethers.Contract(TOKEN_ADDRESS, ERC20_ABI, signer);
       await approveToken(CONTRACT_ADDRESS, tokenContract);
 
+      await new Promise(resolve => setTimeout(resolve, 3000));
+      addLog({type: 'simple', message: 'Waiting for allowance sync...'});
+
+      const newAllowance = await tokenContract.allowance(account, CONTRACT_ADDRESS);
+      const required = ethers.parseEther(betAmount.toString()) * BigInt(numBets);
+      if (newAllowance < required) {
+        addLog({type: 'simple', message: `Allowance still low, retrying approve...`});
+        await approveToken(CONTRACT_ADDRESS, tokenContract);
+        await new Promise(resolve => setTimeout(resolve, 2000));
+      }
+
       for (let i = 0; i < numBets; i++) {
         if (stopRequested) break;
         const currentGuess = mode === '1' ? guess : '0123456789abcdef'.charAt(Math.floor(Math.random() * 16));
@@ -424,6 +483,7 @@ const App = () => {
         await resolveBet(contract, betId);
         await new Promise(resolve => setTimeout(resolve, COOLDOWN * 1000));
         updateBalance();
+        updateContractBalance();
       }
     } catch (error) {
       addLog({type: 'simple', message: `Betting process error: ${error.message}`});
@@ -444,7 +504,7 @@ const App = () => {
   return (
     <div className="app-container">
       <header className="app-header">
-        <h1>Monad Betting Game</h1>
+        <h1>MONAD Betting Game</h1>
         <p className="subtitle">Bet on the blockchain – Win big or go home!</p>
         <p className="visitor-count">Welcome, you are the {visitorCount}th visitor</p>
       </header>
@@ -461,8 +521,7 @@ const App = () => {
       </div>
       {account && (
         <div className="account-info">
-          <p>Account: {shortenHash(account)}</p>
-          <p>Balance: {balance} GTK</p>
+          <p>Account: {shortenHash(account)}    Balance: {balance} GTK</p>
         </div>
       )}
       <div className="button-group">
@@ -472,6 +531,9 @@ const App = () => {
         <button className="claim-btn" onClick={claimTokens}>
           Claim Tokens
         </button>
+        <div className="vault-info">
+          Vault: {contractBalance} GTK
+        </div>
       </div>
       <Modal
         isOpen={modalIsOpen}
