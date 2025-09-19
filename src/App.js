@@ -107,7 +107,7 @@ const CLAIM_CONTRACT_ADDRESS = "0xfcBA9b0ABc504bCBb89F0771833c57F17FDbdd42";
 const EXPLORER_URL = "https://testnet.monadexplorer.com";
 const COOLDOWN = 1; // seconds
 const BLOCK_WAIT_TIME = 2; // seconds
-const MONAD_CHAIN_ID_HEX = "0x2797"; // 10143 in hex
+const MONAD_CHAIN_ID_HEX = "0x279F"; // 10143 in hex
 
 const CLAIM_ABI = [
   {
